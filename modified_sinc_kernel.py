@@ -11,11 +11,35 @@ from scipy import ndimage
 def filter_modified_sinc(
     signal: numpy.ndarray, n: int, edge_frequency: int, sample_rate: int
 ):
+    """Filter a signal with an optimal lowpass filter, a modified sinc kernel.
+
+    Args:
+        signal: Input signal.
+        n: Desired order. Must be an even number between 2 and 10.
+        edge_frequency: Desired edge frequency of the lowpass filter in Hz.
+        sample_rate: Corresponding signal sample rate.
+
+    Returns:
+        The smoothed signal
+    """
+    if (n < 2) or (n > 10) or numpy.mod(n, 2):
+        raise ValueError("The value 'n' must be an even number between 2 and 10")
+
     kernel = _get_ms_kernel(n=n, edge_frequency=edge_frequency, sample_rate=sample_rate)
     return ndimage.convolve1d(signal, kernel)
 
 
 def _get_ms_kernel(n: int, edge_frequency: int, sample_rate: int):
+    """Compose the modified sinc kernel.
+
+    Args:
+        n: Desired order. Must be an even number between 2 and 10.
+        edge_frequency: Desired edge frequency of the lowpass filter in Hz.
+        sample_rate: Corresponding signal sample rate.
+
+    Returns:
+        The modified kernel
+    """
     m = _compute_m(n, edge_frequency=edge_frequency, sample_rate=sample_rate)
 
     x = numpy.arange(-m, m + 1) / (m + 1)
@@ -39,7 +63,7 @@ def _get_ms_kernel(n: int, edge_frequency: int, sample_rate: int):
 def _compute_m(n, edge_frequency: int, sample_rate: int):
     b = 2 * edge_frequency / sample_rate
     m = (0.745 + 0.249 * n) / b - 1
-    return numpy.ceil(m)
+    return int(numpy.ceil(m))
 
 
 def _get_gaussian(x: numpy.ndarray, alpha=4):
@@ -66,7 +90,9 @@ def _get_correction_coefficients(n, num_terms=1):
         else:
             return 0.00367, 0.12780, 2.77031
     else:
-        ValueError("The desired value for 'n' is invalid. Choose between 6 and 10")
+        raise ValueError(
+            "The desired value for 'n' is invalid. Choose between 6 and 10"
+        )
 
 
 def _get_nu(n: int):
@@ -93,7 +119,7 @@ if __name__ == "__main__":
     )
 
     n = 4
-    edge_frequency = 100
+    edge_frequency = 80
     smoothed_sinusoid = filter_modified_sinc(
         noisy_sinusoid, n=n, edge_frequency=edge_frequency, sample_rate=sample_rate
     )
@@ -101,7 +127,7 @@ if __name__ == "__main__":
     fig, ax = pyplot.subplots()
     ax.plot(time, clean_sinusoid, color="k", label="Clean")
     ax.plot(time, noisy_sinusoid, label="Noisy")
-    ax.plot(time, smoothed_sinusoid, label="Smoothed")
+    ax.plot(time, smoothed_sinusoid, linewidth=2.5, label="Smoothed")
     ax.legend()
     ax.set_xlim(0, 1e-1)
 
