@@ -40,7 +40,8 @@ def _get_ms_kernel(n: int, edge_frequency: int, sample_rate: int):
     Returns:
         The modified kernel
     """
-    m = _compute_m(n, edge_frequency=edge_frequency, sample_rate=sample_rate)
+    b = 2 * edge_frequency / sample_rate
+    m = int(numpy.ceil((0.745 + 0.249 * n) / b - 1))
 
     x = numpy.arange(-m, m + 1) / (m + 1)
     gaussian = _get_gaussian(x)
@@ -52,18 +53,12 @@ def _get_ms_kernel(n: int, edge_frequency: int, sample_rate: int):
 
     if n >= 6:
         a, b, c = _get_correction_coefficients(n, num_terms=1)
-        kappa = a + b / (c - m)
-        nu = _get_nu(n)
+        kappa = a + b / (c - m) ** 3
+        nu = 1 if numpy.mod(n / 2, 2) else 2
         sinc += kappa * x * numpy.sin(nu * numpy.pi * x)
 
     modified_sinc = gaussian * sinc
     return modified_sinc / numpy.sum(modified_sinc)
-
-
-def _compute_m(n, edge_frequency: int, sample_rate: int):
-    b = 2 * edge_frequency / sample_rate
-    m = (0.745 + 0.249 * n) / b - 1
-    return int(numpy.ceil(m))
 
 
 def _get_gaussian(x: numpy.ndarray, alpha=4):
@@ -95,10 +90,6 @@ def _get_correction_coefficients(n, num_terms=1):
         )
 
 
-def _get_nu(n: int):
-    return 1 if numpy.mod(n / 2, 2) else 2
-
-
 def _get_noisy_sinusoid(len_signal_sec: int, sample_rate: int, frequency: int = 100):
     len_sec = round(len_signal_sec * sample_rate)
     time = numpy.arange(len_sec) / sample_rate
@@ -118,7 +109,7 @@ if __name__ == "__main__":
         len_signal_sec=len_signal_sec, sample_rate=sample_rate, frequency=frequency
     )
 
-    n = 4
+    n = 8
     edge_frequency = 80
     smoothed_sinusoid = filter_modified_sinc(
         noisy_sinusoid, n=n, edge_frequency=edge_frequency, sample_rate=sample_rate
