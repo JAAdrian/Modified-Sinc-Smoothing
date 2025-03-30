@@ -90,6 +90,49 @@ def _get_correction_coefficients(n, num_terms=1):
         )
 
 
+def filter_alpha_beta_filter(
+    signal_vector: numpy.ndarray, time_constant: float, sample_rate: int
+) -> numpy.ndarray:
+    filter = alpha_beta_filter(
+        signal_vector=signal_vector,
+        time_constant=time_constant,
+        sample_rate=sample_rate,
+    )
+    output_signal = list()
+    velocity_estimation = list()
+    for smoothed_sample, velocity in filter:
+        output_signal.append(smoothed_sample)
+        velocity_estimation.append(velocity)
+
+    alpha = 1 - numpy.exp(-1 / (time_constant * sample_rate))
+    delay = round(1 / alpha - 0.5)
+    return (
+        numpy.roll(numpy.array(output_signal), -delay),
+        numpy.roll(numpy.array(velocity_estimation), -delay),
+    )
+
+
+def alpha_beta_filter(
+    signal_vector: numpy.ndarray, time_constant: float, sample_rate: int
+):
+    position = signal_vector[0]
+    velocity = 0
+
+    alpha = 1 - numpy.exp(-1 / round(time_constant * sample_rate))
+    beta = 2 * (2 - alpha) - 4 * numpy.sqrt(1 - alpha)
+    for sample in signal_vector:
+        # transition step
+        position += velocity / sample_rate
+
+        residual = sample - position
+
+        # update step
+        position += alpha * residual
+        velocity += (beta * velocity) * sample_rate
+
+        yield position, velocity
+
+
 def _get_noisy_sinusoid(len_signal_sec: int, sample_rate: int, frequency: int = 100):
     len_sec = round(len_signal_sec * sample_rate)
     time = numpy.arange(len_sec) / sample_rate
@@ -184,20 +227,65 @@ if __name__ == "__main__":
         noisy_spectrum,
         n=n_spectrum,
         edge_frequency=edge_frequency_spectrum,
-        sample_rate=sample_rate
+        sample_rate=sample_rate,
     )
+
+    alpha_beta_smoothed_sinusoid, _ = filter_alpha_beta_filter(
+        signal_vector=noisy_sinusoid, time_constant=8e-4, sample_rate=sample_rate
+    )
+    alpha_beta_smoothed_spectrum, _ = filter_alpha_beta_filter(
+        signal_vector=noisy_spectrum, time_constant=5e-4, sample_rate=sample_rate
+    )
+
+    rmse_sinc_sinusoid = numpy.sqrt(
+        numpy.mean((clean_sinusoid - smoothed_sinusoid) ** 2)
+    )
+    rmse_alphabeta_sinusoid = numpy.sqrt(
+        numpy.mean((clean_sinusoid - alpha_beta_smoothed_sinusoid) ** 2)
+    )
+    rmse_sinc_spectrum = numpy.sqrt(
+        numpy.mean((clean_spectrum - smoothed_spectrum) ** 2)
+    )
+    rmse_alphabeta_spectrum = numpy.sqrt(
+        numpy.mean((clean_spectrum - alpha_beta_smoothed_spectrum) ** 2)
+    )
+
+    print("RMSE Sinusoid Modified-Sinc")
+    print(rmse_sinc_sinusoid)
+    print("RMSE Sinusoid Alpha-Beta Filter")
+    print(rmse_alphabeta_sinusoid)
+    print("RMSE Spectrum Modified-Sinc")
+    print(rmse_sinc_spectrum)
+    print("RMSE Spectrum Alpha-Beta Filter")
+    print(rmse_alphabeta_spectrum)
 
     fig, ax = pyplot.subplots()
     ax.plot(time, clean_sinusoid, color="k", label="Clean")
     ax.plot(time, noisy_sinusoid, label="Noisy")
-    ax.plot(time, smoothed_sinusoid, linewidth=2.5, label="Smoothed")
+    ax.plot(time, smoothed_sinusoid, linewidth=2.5, label="Sinc-Smoothed")
+    ax.plot(
+        time,
+        alpha_beta_smoothed_sinusoid,
+        linewidth=2.5,
+        label=r"$\alpha-\beta-$Smoothed",
+    )
     ax.legend()
     ax.set_xlim(0, 1e-1)
+    ax.set_xlabel("Time in s")
+    ax.set_ylabel("Amplitude")
 
     fig, ax = pyplot.subplots()
     ax.plot(frequency, clean_spectrum, color="k", label="Clean")
     ax.plot(frequency, noisy_spectrum, label="Noisy")
-    ax.plot(frequency, smoothed_spectrum, linewidth=2.5, label="Smoothed")
+    ax.plot(frequency, smoothed_spectrum, linewidth=2.5, label="Sinc-Smoothed")
+    ax.plot(
+        frequency,
+        alpha_beta_smoothed_spectrum,
+        linewidth=2.5,
+        label=r"$\alpha-\beta-$Smoothed",
+    )
     ax.legend()
+    ax.set_xlabel("Frequency in Hz")
+    ax.set_ylabel("Power Spectral Density in dB re. $1^2$/Hz")
 
     pyplot.show()
