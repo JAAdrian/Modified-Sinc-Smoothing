@@ -253,11 +253,11 @@ if __name__ == "__main__":
     print("RMSE Sinusoid Modified-Sinc")
     print(rmse_sinc_sinusoid)
     print("RMSE Sinusoid Alpha-Beta Filter")
-    print(rmse_alphabeta_sinusoid)
+    print(rmse_alphabeta_sinusoid, "\n")
     print("RMSE Spectrum Modified-Sinc")
     print(rmse_sinc_spectrum)
     print("RMSE Spectrum Alpha-Beta Filter")
-    print(rmse_alphabeta_spectrum)
+    print(rmse_alphabeta_spectrum, "\n")
 
     fig, ax = pyplot.subplots()
     ax.plot(time, clean_sinusoid, color="k", label="Clean")
